@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API anahtarınızı buraya ekleyin
-const API_KEY = 'YOUR_API_KEY';
+const API_KEY = '154cf159';
 const BASE_URL = 'http://www.omdbapi.com/';
 const POSTER_URL = 'http://img.omdbapi.com/';
 
