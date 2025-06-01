@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import MovieCard from '../components/MovieCard';
+import { searchMovies } from '../services/api';
 
 const CategoriesScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState('Movies');
+  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   const categories = [
     { id: '1', title: 'Movies' },
@@ -23,13 +30,64 @@ const CategoriesScreen = () => {
     ]
   };
 
+  const loadMovies = async (genre, pageNum = 1) => {
+    try {
+      setLoading(true);
+      const response = await searchMovies(genre, pageNum);
+      
+      if (response.Response === 'True') {
+        const newMovies = response.Search.map(movie => ({
+          ...movie,
+          Type: selectedCategory.toLowerCase()
+        }));
+        
+        if (pageNum === 1) {
+          setMovies(newMovies);
+        } else {
+          setMovies(prev => [...prev, ...newMovies]);
+        }
+        
+        setHasMore(response.Search.length === 10);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading movies:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedGenre) {
+      setPage(1);
+      loadMovies(selectedGenre, 1);
+    }
+  }, [selectedGenre, selectedCategory]);
+
+  const handleGenrePress = (genre) => {
+    setSelectedGenre(genre);
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadMovies(selectedGenre, nextPage);
+    }
+  };
+
   const renderCategoryItem = ({ item }) => (
     <TouchableOpacity
       style={[
         styles.categoryButton,
         selectedCategory === item.title && styles.selectedCategory
       ]}
-      onPress={() => setSelectedCategory(item.title)}
+      onPress={() => {
+        setSelectedCategory(item.title);
+        setSelectedGenre(null);
+        setMovies([]);
+      }}
     >
       <Text style={[
         styles.categoryText,
@@ -41,9 +99,29 @@ const CategoriesScreen = () => {
   );
 
   const renderGenreItem = ({ item }) => (
-    <TouchableOpacity style={styles.genreButton}>
-      <Text style={styles.genreText}>{item}</Text>
+    <TouchableOpacity 
+      style={[
+        styles.genreButton,
+        selectedGenre === item && styles.selectedGenre
+      ]}
+      onPress={() => handleGenrePress(item)}
+    >
+      <Text style={[
+        styles.genreText,
+        selectedGenre === item && styles.selectedGenreText
+      ]}>
+        {item}
+      </Text>
     </TouchableOpacity>
+  );
+
+  const renderMovieItem = ({ item }) => (
+    <View style={styles.movieCardContainer}>
+      <MovieCard 
+        movie={item}
+        onPress={() => {/* Navigate to detail screen */}}
+      />
+    </View>
   );
 
   return (
@@ -56,13 +134,28 @@ const CategoriesScreen = () => {
         showsHorizontalScrollIndicator={false}
         style={styles.categoriesList}
       />
-      <FlatList
-        data={genres[selectedCategory]}
-        renderItem={renderGenreItem}
-        keyExtractor={(item, index) => index.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.genresList}
-      />
+      {!selectedGenre ? (
+        <FlatList
+          data={genres[selectedCategory]}
+          renderItem={renderGenreItem}
+          keyExtractor={(item, index) => index.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.genresList}
+        />
+      ) : (
+        <FlatList
+          data={movies}
+          renderItem={renderMovieItem}
+          keyExtractor={(item, index) => item.imdbID + index}
+          numColumns={2}
+          contentContainerStyle={styles.moviesList}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={() => (
+            loading ? <ActivityIndicator size="large" color="#007AFF" style={styles.loader} /> : null
+          )}
+        />
+      )}
     </View>
   );
 };
@@ -109,10 +202,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
+  selectedGenre: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
   genreText: {
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  selectedGenreText: {
+    color: '#fff',
+  },
+  moviesList: {
+    padding: 10,
+  },
+  movieCardContainer: {
+    flex: 1,
+    margin: 5,
+  },
+  loader: {
+    paddingVertical: 20,
   },
 });
 
