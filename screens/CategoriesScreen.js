@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator }
 import MovieCard from '../components/MovieCard';
 import { searchMovies } from '../services/api';
 
-const CategoriesScreen = () => {
+const CategoriesScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('Movies');
   const [selectedGenre, setSelectedGenre] = useState(null);
   const [movies, setMovies] = useState([]);
@@ -119,7 +119,7 @@ const CategoriesScreen = () => {
     <View style={styles.movieCardContainer}>
       <MovieCard 
         movie={item}
-        onPress={() => {/* Navigate to detail screen */}}
+        onPress={() => navigation.navigate('MovieInfo', { imdbId: item.imdbID })}
       />
     </View>
   );
