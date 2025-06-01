@@ -88,10 +88,44 @@ export const getMoviesByType = async (type, page = 1) => {
   }
 };
 
+// Yüksek puanlı filmleri getirme
+export const getHighRatedMovies = async () => {
+  try {
+    // Popüler filmleri aramak için genel terimler
+    const searchTerms = ['movie', 'film', 'cinema', 'theatre'];
+    const allMovies = [];
+
+    // Her terim için arama yap
+    for (const term of searchTerms) {
+      const response = await searchMovies(term);
+      if (response.Response === 'True' && response.Search) {
+        allMovies.push(...response.Search);
+      }
+    }
+
+    // Film detaylarını al ve yüksek puanlıları filtrele
+    const movieDetails = await Promise.all(
+      allMovies.map(movie => getMovieById(movie.imdbID))
+    );
+
+    // 8.5 ve üzeri puanlı filmleri filtrele
+    const highRatedMovies = movieDetails.filter(movie => {
+      const rating = parseFloat(movie.imdbRating);
+      return !isNaN(rating) && rating >= 8.5;
+    });
+
+    return highRatedMovies;
+  } catch (error) {
+    console.error('Yüksek puanlı filmler getirilirken hata:', error);
+    throw error;
+  }
+};
+
 export default {
   searchMovies,
   getMovieById,
   getMovieByTitle,
   getPosterUrl,
-  getMoviesByType
+  getMoviesByType,
+  getHighRatedMovies
 }; 

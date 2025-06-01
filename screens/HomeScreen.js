@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import LuckyButton from '../components/LuckyButton';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
@@ -30,6 +31,9 @@ const HomeScreen = () => {
       <View style={styles.topBar}>
         <Text style={styles.greeting}>{greeting}</Text>
       </View>
+      <View style={styles.buttonContainer}>
+        <LuckyButton navigation={navigation} />
+      </View>
       <View style={styles.content}>
         <Text style={styles.text}>Home Screen</Text>
       </View>
@@ -55,6 +59,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+  },
+  buttonContainer: {
+    paddingHorizontal: 20,
+    marginTop: 30,
   },
   content: {
     flex: 1,
