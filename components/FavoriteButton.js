@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
 const FavoriteButton = ({ movie }) => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
-    checkIfFavorite();
-  }, [movie.imdbID]);
+    checkFavoriteStatus();
+  }, [movie]);
 
-  const checkIfFavorite = async () => {
+  const checkFavoriteStatus = async () => {
     try {
       const favorites = await AsyncStorage.getItem('favorites');
       if (favorites) {
@@ -18,7 +18,7 @@ const FavoriteButton = ({ movie }) => {
         setIsFavorite(favoritesArray.some(fav => fav.imdbID === movie.imdbID));
       }
     } catch (error) {
-      console.error('Favori kontrolü hatası:', error);
+      console.error('Favori durumu kontrol edilirken hata:', error);
     }
   };
 
@@ -28,81 +28,49 @@ const FavoriteButton = ({ movie }) => {
       let favoritesArray = favorites ? JSON.parse(favorites) : [];
 
       if (isFavorite) {
-        // Remove from favorites
         favoritesArray = favoritesArray.filter(fav => fav.imdbID !== movie.imdbID);
       } else {
-        // Add to favorites
         favoritesArray.push(movie);
       }
 
       await AsyncStorage.setItem('favorites', JSON.stringify(favoritesArray));
       setIsFavorite(!isFavorite);
     } catch (error) {
-      console.error('Favori güncelleme hatası:', error);
+      console.error('Favori durumu güncellenirken hata:', error);
     }
   };
 
   return (
     <TouchableOpacity
-      style={[styles.button, isFavorite ? styles.favoriteButton : styles.notFavoriteButton]}
+      style={styles.button}
       onPress={toggleFavorite}
-      activeOpacity={0.7}
     >
-      <View style={styles.buttonContent}>
-        <Icon
-          name={isFavorite ? 'favorite' : 'favorite-border'}
-          size={20}
-          color={isFavorite ? '#fff' : '#ff4081'}
-          style={styles.icon}
-        />
-        <Text style={[styles.buttonText, isFavorite ? styles.favoriteText : styles.notFavoriteText]}>
-          {isFavorite ? 'Favorilerden Kaldır' : 'Favorilere Ekle'}
-        </Text>
-      </View>
+      <Icon
+        name={isFavorite ? 'favorite' : 'favorite-border'}
+        size={24}
+        color={isFavorite ? '#ff4081' : '#666'}
+      />
+      <Text style={[styles.buttonText, isFavorite && styles.activeText]}>
+        {isFavorite ? 'Favorilerden Kaldır' : 'Favorilere Ekle'}
+      </Text>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   button: {
-    padding: 12,
-    borderRadius: 25,
-    minWidth: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  icon: {
-    marginRight: 8,
+    padding: 8,
+    marginVertical: 10,
   },
   buttonText: {
+    marginLeft: 8,
     fontSize: 16,
-    fontWeight: '600',
+    color: '#666',
   },
-  favoriteButton: {
-    backgroundColor: '#ff4081',
-  },
-  notFavoriteButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ff4081',
-  },
-  favoriteText: {
-    color: '#fff',
-  },
-  notFavoriteText: {
+  activeText: {
     color: '#ff4081',
   },
 });
