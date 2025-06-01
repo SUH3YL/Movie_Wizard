@@ -9,6 +9,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { getMovieById, getPosterUrl } from '../services/api';
+import FavoriteButton from '../components/FavoriteButton';
 
 const MovieInfoScreen = ({ route }) => {
   const [movie, setMovie] = useState(null);
@@ -54,6 +55,9 @@ const MovieInfoScreen = ({ route }) => {
           style={styles.poster}
           resizeMode="contain"
         />
+        <View style={styles.favoriteButtonContainer}>
+          <FavoriteButton movie={movie} />
+        </View>
         <View style={styles.infoContainer}>
           <Text style={styles.title}>{movie.Title}</Text>
           <Text style={styles.year}>{movie.Year}</Text>
@@ -115,6 +119,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 400,
     backgroundColor: '#f0f0f0',
+  },
+  favoriteButtonContainer: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   infoContainer: {
     padding: 16,
