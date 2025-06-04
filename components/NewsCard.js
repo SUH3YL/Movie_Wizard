@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 
-const NewsCard = ({ news }) => {
+const NewsCard = ({ news, navigation }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('tr-TR', {
@@ -19,9 +19,17 @@ const NewsCard = ({ news }) => {
   };
 
   const handlePress = () => {
-    if (news.href) {
-      Linking.openURL(news.href);
+    navigation.navigate('News', { news });
+  };
+
+  const getSourceName = () => {
+    if (news.source && typeof news.source === 'object' && news.source.name) {
+      return news.source.name;
     }
+    if (news.source && typeof news.source === 'string') {
+      return news.source;
+    }
+    return 'Kaynak Belirtilmemiş';
   };
 
   return (
@@ -42,9 +50,7 @@ const NewsCard = ({ news }) => {
         <Text style={styles.description}>{truncateText(news.description, 150)}</Text>
         <View style={styles.footer}>
           <Text style={styles.date}>{formatDate(news.published_at)}</Text>
-          {news.source && news.source.name && (
-            <Text style={styles.source}>{news.source.name}</Text>
-          )}
+          <Text style={styles.source}>{getSourceName()}</Text>
         </View>
       </View>
     </TouchableOpacity>

@@ -86,7 +86,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const renderNewsItem = ({ item }) => (
-    <NewsCard news={item} />
+    <NewsCard news={item} navigation={navigation} />
   );
 
   const renderFooter = () => {

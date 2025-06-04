@@ -1,208 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Modal, View, FlatList, Alert } from 'react-native';
+import { TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { getFavoriteLists, addMovieToFavoriteList, removeMovieFromFavoriteList } from '../services/favoritesService';
+import { getFavorites, addToFavorites, removeFromFavorites } from '../services/favoritesService';
 
 const FavoriteButton = ({ movie }) => {
   const [isFavorite, setIsFavorite] = useState(false);
-  const [favoriteLists, setFavoriteLists] = useState([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedList, setSelectedList] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     checkFavoriteStatus();
-    loadFavoriteLists();
-  }, [movie]);
-
-  const loadFavoriteLists = async () => {
-    try {
-      const lists = await getFavoriteLists();
-      setFavoriteLists(lists);
-    } catch (error) {
-      console.error('Favori listeleri yüklenirken hata:', error);
-    }
-  };
+  }, []);
 
   const checkFavoriteStatus = async () => {
     try {
-      const lists = await getFavoriteLists();
-      const isInAnyList = lists.some(list => 
-        list.movies.some(m => m.imdbID === movie.imdbID)
-      );
-      setIsFavorite(isInAnyList);
+      setIsLoading(true);
+      const favorites = await getFavorites();
+      const movieId = movie.id || movie.imdbID;
+      const isMovieInFavorites = favorites.some(m => m.id === movieId);
+      setIsFavorite(isMovieInFavorites);
     } catch (error) {
       console.error('Favori durumu kontrol edilirken hata:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleFavoritePress = () => {
-    if (isFavorite) {
-      // Film favorilerde ise, hangi listeden kaldırmak istediğini sor
-      const listsWithMovie = favoriteLists.filter(list => 
-        list.movies.some(m => m.imdbID === movie.imdbID)
-      );
-      
-      if (listsWithMovie.length === 1) {
-        // Film sadece bir listede ise direkt kaldır
-        removeFromList(listsWithMovie[0].name);
+  const handleFavoritePress = async () => {
+    try {
+      if (isFavorite) {
+        const movieId = movie.id || movie.imdbID;
+        await removeFromFavorites(movieId);
+        setIsFavorite(false);
+        Alert.alert('Başarılı', 'Film favorilerden kaldırıldı.');
       } else {
-        // Film birden fazla listede ise seçim yaptır
-        setSelectedList(listsWithMovie[0].name);
-        setModalVisible(true);
+        await addToFavorites(movie);
+        setIsFavorite(true);
+        Alert.alert('Başarılı', 'Film favorilere eklendi.');
       }
-    } else {
-      // Film favorilerde değilse, hangi listeye eklemek istediğini sor
-      setModalVisible(true);
-    }
-  };
-
-  const addToList = async (listName) => {
-    try {
-      await addMovieToFavoriteList(listName, movie);
-      setIsFavorite(true);
-      setModalVisible(false);
-      Alert.alert('Başarılı', 'Film favori listesine eklendi.');
     } catch (error) {
-      Alert.alert('Hata', 'Film favori listesine eklenirken bir hata oluştu.');
+      console.error('Favori işlemi sırasında hata:', error);
+      Alert.alert('Hata', 'İşlem sırasında bir hata oluştu.');
     }
   };
 
-  const removeFromList = async (listName) => {
-    try {
-      await removeMovieFromFavoriteList(listName, movie.imdbID);
-      await checkFavoriteStatus();
-      setModalVisible(false);
-      Alert.alert('Başarılı', 'Film favori listesinden kaldırıldı.');
-    } catch (error) {
-      Alert.alert('Hata', 'Film favori listesinden kaldırılırken bir hata oluştu.');
-    }
-  };
-
-  const renderListItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.listItem}
-      onPress={() => {
-        if (isFavorite) {
-          removeFromList(item.name);
-        } else {
-          addToList(item.name);
-        }
-      }}
-    >
-      <Text style={styles.listItemText}>{item.name}</Text>
-      {item.movies.some(m => m.imdbID === movie.imdbID) && (
-        <Icon name="check" size={20} color="#4CAF50" />
-      )}
-    </TouchableOpacity>
-  );
+  if (isLoading) {
+    return (
+      <TouchableOpacity style={styles.favoriteButton} disabled>
+        <Icon name="favorite-border" size={24} color="#666" />
+      </TouchableOpacity>
+    );
+  }
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={handleFavoritePress}
-      >
-        <Icon
-          name={isFavorite ? 'favorite' : 'favorite-border'}
-          size={24}
-          color={isFavorite ? '#ff4081' : '#666'}
-        />
-        <Text style={[styles.buttonText, isFavorite && styles.activeText]}>
-          {isFavorite ? 'Favorilerden Kaldır' : 'Favorilere Ekle'}
-        </Text>
-      </TouchableOpacity>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {isFavorite ? 'Favorilerden Kaldır' : 'Favorilere Ekle'}
-            </Text>
-            <FlatList
-              data={favoriteLists}
-              renderItem={renderListItem}
-              keyExtractor={(item) => item.name}
-              style={styles.listContainer}
-            />
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Kapat</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </>
+    <TouchableOpacity
+      style={styles.favoriteButton}
+      onPress={handleFavoritePress}
+    >
+      <Icon
+        name={isFavorite ? 'favorite' : 'favorite-border'}
+        size={24}
+        color={isFavorite ? '#FF3B30' : '#666'}
+      />
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  favoriteButton: {
     padding: 8,
-    marginVertical: 10,
-  },
-  buttonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#666',
-  },
-  activeText: {
-    color: '#ff4081',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    width: '80%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  listContainer: {
-    maxHeight: 300,
-  },
-  listItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  listItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  closeButton: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    color: '#666',
   },
 });
 
