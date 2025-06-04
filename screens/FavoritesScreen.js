@@ -7,32 +7,42 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Modal,
+  TextInput,
+  Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { getPosterUrl } from '../services/api';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {
+  getFavoriteLists,
+  removeMovieFromFavoriteList,
+  createFavoriteList,
+  deleteFavoriteList,
+} from '../services/favoritesService';
 
 const FavoritesScreen = ({ navigation }) => {
-  const [favorites, setFavorites] = useState([]);
+  const [favoriteLists, setFavoriteLists] = useState([]);
+  const [selectedList, setSelectedList] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [newListName, setNewListName] = useState('');
 
   useEffect(() => {
-    loadFavorites();
+    loadFavoriteLists();
   }, []);
 
-  // Favorileri yükle
-  const loadFavorites = async () => {
+  // Favori listelerini yükle
+  const loadFavoriteLists = async () => {
     try {
       setLoading(true);
-      const favoritesData = await AsyncStorage.getItem('favorites');
-      if (favoritesData) {
-        setFavorites(JSON.parse(favoritesData));
-      } else {
-        setFavorites([]);
+      const lists = await getFavoriteLists();
+      setFavoriteLists(lists);
+      if (lists.length > 0 && !selectedList) {
+        setSelectedList(lists[0].name);
       }
     } catch (error) {
-      console.error('Favoriler yüklenirken hata:', error);
+      console.error('Favori listeleri yüklenirken hata:', error);
     } finally {
       setLoading(false);
     }
@@ -41,18 +51,45 @@ const FavoritesScreen = ({ navigation }) => {
   // Ekran her odaklandığında favorileri yeniden yükle
   useFocusEffect(
     React.useCallback(() => {
-      loadFavorites();
+      loadFavoriteLists();
     }, [])
   );
 
   // Favorilerden kaldır
   const removeFavorite = async (imdbId) => {
     try {
-      const updatedFavorites = favorites.filter(movie => movie.imdbID !== imdbId);
-      await AsyncStorage.setItem('favorites', JSON.stringify(updatedFavorites));
-      setFavorites(updatedFavorites);
+      await removeMovieFromFavoriteList(selectedList, imdbId);
+      await loadFavoriteLists();
     } catch (error) {
       console.error('Favori kaldırılırken hata:', error);
+      Alert.alert('Hata', 'Film favorilerden kaldırılırken bir hata oluştu.');
+    }
+  };
+
+  // Yeni liste oluştur
+  const createList = async () => {
+    if (!newListName.trim()) {
+      Alert.alert('Hata', 'Lütfen bir liste adı girin.');
+      return;
+    }
+
+    try {
+      await createFavoriteList(newListName.trim());
+      setNewListName('');
+      setModalVisible(false);
+      await loadFavoriteLists();
+    } catch (error) {
+      Alert.alert('Hata', 'Liste oluşturulurken bir hata oluştu.');
+    }
+  };
+
+  // Liste sil
+  const handleDeleteList = async (listName) => {
+    try {
+      await deleteFavoriteList(listName);
+      await loadFavoriteLists();
+    } catch (error) {
+      Alert.alert('Hata', 'Liste silinirken bir hata oluştu.');
     }
   };
 
@@ -82,6 +119,48 @@ const FavoritesScreen = ({ navigation }) => {
     </View>
   );
 
+  const renderListHeader = () => (
+    <View style={styles.listHeader}>
+      <FlatList
+        horizontal
+        data={favoriteLists}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[
+              styles.listTab,
+              selectedList === item.name && styles.selectedListTab
+            ]}
+            onPress={() => setSelectedList(item.name)}
+          >
+            <Text style={[
+              styles.listTabText,
+              selectedList === item.name && styles.selectedListTabText
+            ]}>
+              {item.name}
+            </Text>
+            {item.name !== 'Favoriler' && (
+              <TouchableOpacity
+                style={styles.deleteListButton}
+                onPress={() => handleDeleteList(item.name)}
+              >
+                <Icon name="close" size={16} color="#666" />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+        )}
+        keyExtractor={(item) => item.name}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.listTabsContainer}
+      />
+      <TouchableOpacity
+        style={styles.addListButton}
+        onPress={() => setModalVisible(true)}
+      >
+        <Icon name="add" size={24} color="#007AFF" />
+      </TouchableOpacity>
+    </View>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -90,22 +169,64 @@ const FavoritesScreen = ({ navigation }) => {
     );
   }
 
-  if (favorites.length === 0) {
+  const selectedListData = favoriteLists.find(list => list.name === selectedList);
+
+  if (!selectedListData || selectedListData.movies.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Henüz favori filminiz bulunmuyor.</Text>
+      <View style={styles.container}>
+        {renderListHeader()}
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Bu listede henüz film bulunmuyor.</Text>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {renderListHeader()}
       <FlatList
-        data={favorites}
+        data={selectedListData.movies}
         renderItem={renderMovieItem}
         keyExtractor={(item) => item.imdbID}
         contentContainerStyle={styles.listContainer}
       />
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Yeni Liste Oluştur</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Liste adı"
+              value={newListName}
+              onChangeText={setNewListName}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setModalVisible(false);
+                  setNewListName('');
+                }}
+              >
+                <Text style={styles.buttonText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={createList}
+              >
+                <Text style={[styles.buttonText, styles.createButtonText]}>Oluştur</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -131,6 +252,43 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#666',
     textAlign: 'center',
+  },
+  listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  listTabsContainer: {
+    flexGrow: 1,
+  },
+  listTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginRight: 10,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  selectedListTab: {
+    backgroundColor: '#007AFF',
+  },
+  listTabText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedListTabText: {
+    color: '#fff',
+  },
+  deleteListButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  addListButton: {
+    padding: 8,
   },
   listContainer: {
     padding: 10,
@@ -196,6 +354,55 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.41,
     elevation: 2,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  createButton: {
+    backgroundColor: '#007AFF',
+  },
+  buttonText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#666',
+  },
+  createButtonText: {
+    color: '#fff',
   },
 });
 
